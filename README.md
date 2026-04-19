@@ -73,3 +73,23 @@ sudo ./install.sh --verbose 2>&1 | tee install.log
 Follow the repository's license. If none, assume standard open-source licensing applies and consult the project owner.
 
 That's it — run the script following the Quick start section and consult the script's built-in help for script-specific options.
+
+---
+
+## 💖 Support Future Development
+
+If you find these scripts useful, consider supporting the project:
+
+| 💰 Currency                 | 📋 Address                                    |
+| --------------------------- | --------------------------------------------- |
+| ₿ **BTC** (Bitcoin)         | `bc1qr0s6dv4rvh245wax2kwdwyv8rz8radlfnquc7k`  |
+| ⟠ **ETH** (Ethereum)        | `0x58d8b821dE46D61d9d1034313919d5370F4A8E88`  |
+| ◎ **SOL** (Solana)          | `gG1VLq8GFXMqPu2mNXkHHk1535MHg66pQVh8QYz5krj` |
+| 💵 **USDT** (Tether on ETH) | `0x58d8b821dE46D61d9d1034313919d5370F4A8E88`  |
+
+---
+
+<p align="center">
+  ⭐ Star this repo if you find it helpful!<br/>
+  Made with ❤️ by <a href="https://github.com/leduong">leduong</a>
+</p>
