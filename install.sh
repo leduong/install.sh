@@ -80,7 +80,7 @@ else
 fi
 
 log_info "Installing Python packages for 'o11'"
-su - o11 -c "pip3 install --user --break-system-packages pycurl bs4 curl_cffi redis pywidevine pyplayready requests pytz dnspython requests_toolbelt PySocks cloudscraper"
+su - o11 -c "pip3 install --user --break-system-packages pycurl bs4 curl_cffi redis pywidevine pyplayready requests pytz dnspython requests_toolbelt PySocks cloudscraper lxml"
 log_ok "Python packages installed"
 
 log_title "Downloading o11 binaries & config"
