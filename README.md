@@ -11,7 +11,7 @@ curl -fsSL https://github.com/leduong/install.sh/raw/refs/heads/o11/install.sh |
 ## Web UI
 
 ```
-http://YOUR_IP:8283
+http://YOUR_IP:8234
 Username: admin
 Password: 1
 ```
