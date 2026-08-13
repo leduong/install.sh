@@ -18,3 +18,13 @@ fail2ban-unban:
 
 fail2ban-unban-all:
 	sudo fail2ban-client unban --all
+
+# clean log and cache on Ubuntu/Debian
+clean-system:
+	sudo journalctl --vacuum-time=3d
+	sudo apt clean
+	sudo apt autoremove -y
+	sudo find /var/log -type f -name "*.gz" -delete
+	sudo find /var/log -type f -regex ".*\.[0-9]+" -delete
+	sudo truncate -s 0 /var/log/*.log 2>/dev/null || true
+	rm -rf ~/.cache/*
