@@ -26,7 +26,7 @@ ensure_line() {
 
 log_title "Updating package list and installing dependencies"
 apt update && apt upgrade -y
-apt install -y ufw redis-server ffmpeg wget python3-pip nginx-full
+apt install -y ufw fail2ban redis-server ffmpeg wget python3-pip nginx-full
 
 log_title "Configuring nginx"
 NGINX_DEFAULT_SITE=/etc/nginx/sites-enabled/default
@@ -42,9 +42,25 @@ else
 fi
 
 cat <<'EOL' > "$NGINX_O11_SITE"
+log_format o11_proxy '$remote_addr - [$time_local] "$request" $status';
+
 server {
   listen 8234;
   listen [::]:8234;
+
+  access_log /var/log/nginx/o11_proxy.log o11_proxy;
+
+  location /stream/ {
+    access_log off;
+    proxy_pass http://127.0.0.1:8283;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
 
   location / {
     proxy_pass http://127.0.0.1:8283;
@@ -175,7 +191,103 @@ ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw allow 8234/tcp
+echo "y" | sudo ufw enable
 log_ok "Firewall rules added"
+
+log_title "Hardening SSH configuration"
+SSHD_CONFIG=/etc/ssh/sshd_config
+[ -f "${SSHD_CONFIG}.orig" ] || cp "$SSHD_CONFIG" "${SSHD_CONFIG}.orig"
+
+# Set (or replace) a directive in sshd_config, uncommenting it if needed
+ensure_sshd_option() {
+  option="$1"
+  value="$2"
+  if grep -qE "^[#[:space:]]*${option}[[:space:]]" "$SSHD_CONFIG"; then
+    sed -i -E "s|^[#[:space:]]*${option}[[:space:]].*|${option} ${value}|" "$SSHD_CONFIG"
+  else
+    echo "${option} ${value}" >> "$SSHD_CONFIG"
+  fi
+  log_ok "sshd_config: ${option} ${value}"
+}
+
+# The account actually used to SSH in (via sudo) — falls back to root
+SSH_USER="${SUDO_USER:-root}"
+SSH_USER_HOME=$(eval echo "~${SSH_USER}")
+USER_HAS_KEY=false
+ROOT_HAS_KEY=false
+[ -s "${SSH_USER_HOME}/.ssh/authorized_keys" ] && USER_HAS_KEY=true
+[ -s /root/.ssh/authorized_keys ] && ROOT_HAS_KEY=true
+
+ensure_sshd_option "LoginGraceTime" "30"
+ensure_sshd_option "MaxAuthTries" "3"
+ensure_sshd_option "MaxSessions" "2"
+ensure_sshd_option "PermitEmptyPasswords" "no"
+
+if [ "$ROOT_HAS_KEY" = true ]; then
+  # Root has a working key — keep key-based root login, block root password login
+  ensure_sshd_option "PermitRootLogin" "prohibit-password"
+else
+  log_warn "No SSH key found for root — leaving PermitRootLogin untouched to avoid lockout"
+fi
+
+if [ "$USER_HAS_KEY" = true ] || [ "$ROOT_HAS_KEY" = true ]; then
+  ensure_sshd_option "PasswordAuthentication" "no"
+  log_ok "SSH key login confirmed for '${SSH_USER}' — password authentication disabled"
+else
+  log_warn "No SSH key found for '${SSH_USER}' or root — leaving PasswordAuthentication enabled to avoid lockout"
+fi
+
+if sshd -t; then
+  systemctl reload ssh
+  log_ok "sshd config validated and reloaded"
+else
+  log_error "sshd config test failed — reverting to backup"
+  cp "${SSHD_CONFIG}.orig" "$SSHD_CONFIG"
+fi
+
+log_title "Configuring fail2ban"
+cat <<'EOL' > /etc/fail2ban/filter.d/nginx-o11-401.conf
+[Definition]
+failregex = ^<HOST> - \[.*\] ".*" 401$
+ignoreregex =
+EOL
+log_ok "nginx-o11-401 filter created"
+
+cat <<'EOL' > /etc/fail2ban/jail.local
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = %(sshd_log)s
+maxretry = 3
+findtime = 10m
+bantime = 1h
+
+[nginx-http-auth]
+enabled = true
+filter = nginx-http-auth
+port = http,https
+logpath = /var/log/nginx/error.log
+backend = polling
+maxretry = 5
+findtime = 10m
+bantime = 1d
+banaction = ufw
+
+[nginx-o11-401]
+enabled = true
+filter = nginx-o11-401
+port = 8234
+logpath = /var/log/nginx/o11_proxy.log
+backend = polling
+maxretry = 5
+findtime = 10m
+bantime = 24h
+banaction = ufw
+EOL
+systemctl enable --now fail2ban
+systemctl restart fail2ban
+log_ok "fail2ban configured and started"
 
 
 # Get the server's public IPv4 address
