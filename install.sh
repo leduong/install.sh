@@ -48,7 +48,7 @@ server {
   listen 8234;
   listen [::]:8234;
 
-  access_log /var/log/nginx/o11_proxy.log o11_proxy;
+  access_log /var/log/nginx/o11.log o11_proxy;
 
   location /stream/ {
     access_log off;
@@ -56,7 +56,7 @@ server {
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
+    proxy_set_header Host $host:$server_port;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
@@ -67,7 +67,7 @@ server {
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
+    proxy_set_header Host $host:$server_port;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
@@ -274,11 +274,11 @@ findtime = 10m
 bantime = 1d
 banaction = ufw
 
-[nginx-o11-401]
+[o11]
 enabled = true
 filter = nginx-o11-401
 port = 8234
-logpath = /var/log/nginx/o11_proxy.log
+logpath = /var/log/nginx/o11.log
 backend = polling
 maxretry = 5
 findtime = 10m
