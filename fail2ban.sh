@@ -48,7 +48,7 @@ server {
   listen 8234;
   listen [::]:8234;
 
-  access_log /var/log/nginx/o11_proxy.log o11_proxy;
+  access_log /var/log/nginx/o11.log o11_proxy;
 
   location /stream/ {
     access_log off;
@@ -56,7 +56,7 @@ server {
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
+    proxy_set_header Host $host:$server_port;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
@@ -67,7 +67,7 @@ server {
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
+    proxy_set_header Host $host:$server_port;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
@@ -129,22 +129,11 @@ maxretry = 3
 findtime = 10m
 bantime = 1h
 
-[nginx-http-auth]
-enabled = true
-filter = nginx-http-auth
-port = http,https
-logpath = /var/log/nginx/error.log
-backend = polling
-maxretry = 5
-findtime = 10m
-bantime = 1d
-banaction = ufw
-
-[nginx-o11-401]
+[o11]
 enabled = true
 filter = nginx-o11-401
 port = 8234
-logpath = /var/log/nginx/o11_proxy.log
+logpath = /var/log/nginx/o11.log
 backend = polling
 maxretry = 5
 findtime = 10m
@@ -155,10 +144,24 @@ systemctl enable --now fail2ban
 systemctl restart fail2ban
 log_ok "fail2ban configured and started"
 
+IPS_FILE="$(dirname "$0")/ips.txt"
+
 if command -v ufw >/dev/null 2>&1; then
   log_title "Updating firewall (ufw)"
-  ufw allow 8234/tcp
-  log_ok "Allowed port 8234/tcp"
+  if [ -f "$IPS_FILE" ]; then
+    while IFS= read -r ip; do
+      ip="${ip%%#*}"
+      ip="$(echo "$ip" | xargs)"
+      [ -z "$ip" ] && continue
+      ufw allow from "$ip" to any port 8234 proto tcp
+      log_ok "Allowed $ip -> 8234/tcp"
+    done < "$IPS_FILE"
+    ufw deny 8234/tcp
+    log_ok "Denied 8234/tcp for all other IPs"
+  else
+    log_warn "$IPS_FILE not found — allowing 8234/tcp from anywhere"
+    ufw allow 8234/tcp
+  fi
 else
   log_warn "ufw not found — skipping firewall rule"
 fi
