@@ -119,7 +119,22 @@ ignoreregex =
 EOL
 log_ok "nginx-o11-401 filter created"
 
+# IPs in ips.txt are whitelisted (never banned by any jail); everyone else stays subject to auto-ban
+IPS_FILE="$(dirname "$0")/ips.txt"
+IGNORE_IPS="127.0.0.1/8 ::1"
+if [ -f "$IPS_FILE" ]; then
+  while IFS= read -r ip; do
+    ip="${ip%%#*}"
+    ip="$(echo "$ip" | xargs)"
+    [ -z "$ip" ] && continue
+    IGNORE_IPS="$IGNORE_IPS $ip"
+  done < "$IPS_FILE"
+fi
+
 cat <<'EOL' > /etc/fail2ban/jail.local
+[DEFAULT]
+ignoreip = __IGNORE_IPS__
+
 [sshd]
 enabled = true
 port = ssh
@@ -140,28 +155,17 @@ findtime = 10m
 bantime = 24h
 banaction = ufw
 EOL
+sed -i "s|__IGNORE_IPS__|$IGNORE_IPS|" /etc/fail2ban/jail.local
+log_ok "Whitelisted IPs added to ignoreip: $IGNORE_IPS"
+
 systemctl enable --now fail2ban
 systemctl restart fail2ban
 log_ok "fail2ban configured and started"
 
-IPS_FILE="$(dirname "$0")/ips.txt"
-
 if command -v ufw >/dev/null 2>&1; then
   log_title "Updating firewall (ufw)"
-  if [ -f "$IPS_FILE" ]; then
-    while IFS= read -r ip; do
-      ip="${ip%%#*}"
-      ip="$(echo "$ip" | xargs)"
-      [ -z "$ip" ] && continue
-      ufw allow from "$ip" to any port 8234 proto tcp
-      log_ok "Allowed $ip -> 8234/tcp"
-    done < "$IPS_FILE"
-    ufw deny 8234/tcp
-    log_ok "Denied 8234/tcp for all other IPs"
-  else
-    log_warn "$IPS_FILE not found — allowing 8234/tcp from anywhere"
-    ufw allow 8234/tcp
-  fi
+  ufw allow 8234/tcp
+  log_ok "Allowed 8234/tcp (fail2ban's [o11] jail auto-bans abusive IPs)"
 else
   log_warn "ufw not found — skipping firewall rule"
 fi

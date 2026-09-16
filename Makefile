@@ -19,6 +19,19 @@ fail2ban-unban:
 fail2ban-unban-all:
 	sudo fail2ban-client unban --all
 
+# usage: make whitelist  (updates fail2ban's ignoreip so IPs in ips.txt are never banned)
+whitelist:
+	@ips="127.0.0.1/8 ::1"; \
+	while IFS= read -r ip; do \
+		ip="$${ip%%#*}"; \
+		ip="$$(echo $$ip | xargs)"; \
+		[ -z "$$ip" ] && continue; \
+		ips="$$ips $$ip"; \
+	done < ips.txt; \
+	sudo sed -i "s|^ignoreip.*|ignoreip = $$ips|" /etc/fail2ban/jail.local
+	sudo fail2ban-client reload
+	@echo "Whitelist (ignoreip) updated from ips.txt"
+
 # clean log and cache on Ubuntu/Debian
 clean-system:
 	sudo journalctl --vacuum-time=3d
