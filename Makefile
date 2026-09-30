@@ -1,5 +1,15 @@
 SHELL := /bin/bash
 
+.PHONY: install uninstall status fail2ban-status-jail fail2ban-unban fail2ban-unban-all whitelist clean-system
+
+# usage: make install  (runs install.sh to set up o11, nginx, fail2ban, ufw, etc.)
+install:
+	sudo -E bash install.sh
+
+# usage: make uninstall  (reverts install.sh; add PURGE=1 to also delete the o11 user/data)
+uninstall:
+	sudo -E bash uninstall.sh
+
 status:
 	sudo fail2ban-client status sshd
 	sudo fail2ban-client status o11

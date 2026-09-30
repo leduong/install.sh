@@ -1,5 +1,7 @@
 # O11 Streamer V4
 
+![O11 Streamer preview](preview.jpg)
+
 Tested on **Ubuntu 20.04 → 26.04 (Linux/AMD64)**.
 
 > **Recommended:** use **Ubuntu 24.04 LTS** for the best stability — it is the latest long-term-support release and is well tested with `nginx`, `fail2ban`, and `ufw`, which this toolset relies on.
